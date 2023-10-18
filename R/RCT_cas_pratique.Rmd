@@ -7,17 +7,43 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(haven)
+library(tidyverse)
+library(dplyr)
+library(here)
+library(gtsummary)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r import}
+hiv <- read_dta(paste0(here(),"/data/RCT.dta"))
 ```
+
+
+## Contexte
+
+- Les données utilisées proviennent de l’article de Rebecca Thornton “The Demand and Impact of Learning HIV Status” (American Economic Review, 2008)
+- Objectif : baisse du coût résultat test HIV augmente nombre de tests avec 2 interventions : 1. paiement en cash ; 2. variation du montant
+
+## Stats desc
+
+```{r summary}
+summary(hiv)
+```
+```{r compar}
+tab_compar_rct <-
+  hiv %>% 
+  gtsummary::tbl_summary(
+    include = c(age,male,educ2004,hadsex12,eversex,tb,land2004,hiv2004, got),
+    by = any, # split table by group
+    missing = "no" # don't list missing data separately
+  ) %>%
+  add_n() %>% 
+  add_p( # perform t-test for all variables
+    test = everything() ~ "t.test")
+
+tab_compar_rct
+```
+
 
 ## Including Plots
 
