@@ -18,34 +18,54 @@ library(gtsummary)
 hiv <- read_dta(paste0(here(),"/data/RCT.dta"))
 ```
 
+```{r}
+pourcentage <- function(decimal_value, decimal_places = 1) {
+  percentage <- format(decimal_value * 100, nsmall = decimal_places, digits = decimal_places + 2, trim = TRUE, justify = "right", decimal.mark = ",", big.mark = " ")
+  paste0(percentage, "%")
+}
+```
+
 
 ## Contexte
 
-- Les données utilisées proviennent de l’article de Rebecca Thornton “The Demand and Impact of Learning HIV Status” (American Economic Review, 2008)
-- Objectif : baisse du coût résultat test HIV augmente nombre de tests avec 2 interventions : 1. paiement en cash ; 2. variation du montant
+-   Les données utilisées proviennent de l'article de Rebecca Thornton "The Demand and Impact of Learning HIV Status" (American Economic Review, 2008)
+-   Objectif : baisse du coût résultat test HIV augmente nombre de tests avec 2 interventions : 1. paiement en cash ; 2. variation du montant
 
 ## Stats desc
 
 ```{r summary}
 summary(hiv)
+hiv_mean <- hiv %>%
+    summarise_all(mean, na.rm = T)
+
 ```
+
 ```{r compar}
 tab_compar_rct <-
   hiv %>% 
+  # mutate(educ2004=as.factor(educ2004)) %>% 
   gtsummary::tbl_summary(
     include = c(age,male,educ2004,hadsex12,eversex,tb,land2004,hiv2004, got),
     by = any, # split table by group
     missing = "no" # don't list missing data separately
   ) %>%
   add_n() %>% 
-  add_p( # perform t-test for all variables
-    test = everything() ~ "t.test")
+  add_p( # perform t-test for all variables test = everything() ~ "t.test"
+    )
 
 tab_compar_rct
+
+hiv_mean_group <- hiv %>%
+  group_by(any) %>% 
+  summarise_all(mean, na.rm = T)
 ```
+-   `r pourcentage(hiv_mean$any)` de la population s'est vue proposer une incitation financière
+- Les populations test et témoin se différencient sur 3 variables (test de Wilcoxon)
+  - Niveau d'études
+  - Propritaire de terre agricole
+  - A déjà récupéré un test, qui paraît être le point le plus critique avec près d'un quart de la population témoin (`r hiv_mean_group %>% filter(any==0) %>% select(tb) %>% pourcentage()`) contre moins d'un cinquième de la population testée (`r hiv_mean_group %>% filter(any==1) %>% select(tb) %>% pourcentage()`)
 
-
-## Including Plots
+## Analyse graphique
 
 You can also embed plots, for example:
 
