@@ -49,3 +49,5 @@ po/*~
 rsconnect/
 # Data
 *.dta
+# Doc
+*.pdf
