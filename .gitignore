@@ -51,3 +51,4 @@ rsconnect/
 *.dta
 # Doc
 *.pdf
+*.html
