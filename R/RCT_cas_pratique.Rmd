@@ -89,4 +89,54 @@ hiv %>%
       labs(x = "Proportion de test récupérés", y = "Incitation financière", title = "Impact du montant des incitations sur les tests HIV réalisés")
 ```
 
-## 3. Régression de l'effet
+## 3. Régression de l'effet (général)
+
+```{r reg}
+model_spl_any <- lm(got ~ any ,data = hiv )
+model_any <- lm(got ~ any + age + poly(age,2) + male+ as.factor(educ2004)+eversex+tb+land2004+hiv2004,data = hiv ) #moins hadsex12
+model_full_any <- lm(got ~ any + age + poly(age,2) + male+as.factor(educ2004)+hadsex12+eversex+tb+land2004+hiv2004,data = hiv )
+
+model_spl_Ti <- lm(got ~ as.factor(Ti) ,data = hiv )
+model_Ti <- lm(got ~ as.factor(Ti) + age + poly(age,2) + male+ as.factor(educ2004)+eversex+tb+land2004+hiv2004,data = hiv )
+model_full_Ti <- lm(got ~ as.factor(Ti) + age + poly(age,2) + male+as.factor(educ2004)+hadsex12+eversex+tb+land2004+hiv2004,data = hiv )
+
+```
+
+```{r reg_synth}
+modelsummary(list("Intervention spl (Y/N)" = model_spl_any
+               , "Intervention (Y/N)" = model_any
+               , "Intervention cpl (Y/N)" = model_full_any
+               )
+             , stars = TRUE
+             )
+
+modelsummary(list("Montant spl" = model_spl_Ti
+               , "Montant" = model_Ti
+               , "Montant cpl" = model_full_Ti
+               )
+             , stars = TRUE
+             )
+
+```
+
+
+## 4. Heterogénéité
+
+```{r reg}
+model_spl_interact_sex <- lm(got ~ any*male ,data = hiv )
+model_interact_sex <- lm(got ~ any*male + age + poly(age,2) + male+ as.factor(educ2004)+eversex+tb+land2004+hiv2004,data = hiv ) #moins hadsex12
+summary(model_interact_sex)
+
+model_spl_interact_educ <- lm(got ~ any*indic_educ 
+                              ,data = hiv %>% 
+                                mutate(indic_educ = case_when(is.na(educ2004)  ~ NA,
+                                                              educ2004==0  ~ 0,
+                                                              .default = 1)))
+model_interact_educ  <- lm(got ~ any*indic_educ + age + poly(age,2) + male+ +eversex+tb+land2004+hiv2004
+                           ,data = hiv %>% 
+                                mutate(indic_educ = case_when(is.na(educ2004)  ~ NA,
+                                                              educ2004==0  ~ 0,
+                                                              .default = 1)))
+summary(model_interact_educ)
+
+```
