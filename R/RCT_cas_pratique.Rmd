@@ -12,10 +12,14 @@ library(tidyverse)
 library(dplyr)
 library(here)
 library(gtsummary)
+library(car)
 ```
 
 ```{r import}
 hiv <- read_dta(paste0(here(),"/data/RCT.dta"))
+
+hiv <- hiv %>% 
+  mutate(Ti=as.factor(as.character(Ti)))
 ```
 
 ```{r}
@@ -60,7 +64,8 @@ hiv_mean_group <- hiv %>%
   summarise_all(mean, na.rm = T)
 ```
 -   `r pourcentage(hiv_mean$any)` de la population s'est vue proposer une incitation financière
-- Les populations test et témoin se différencient sur 3 variables (test de Wilcoxon)
+- Les populations test et témoin se différencient sur 4 variables (test de Wilcoxon)
+  - Age
   - Niveau d'études
   - Propritaire de terre agricole
   - A déjà récupéré un test, qui paraît être le point le plus critique avec près d'un quart de la population témoin (`r hiv_mean_group %>% filter(any==0) %>% select(tb) %>% pourcentage()`) contre moins d'un cinquième de la population testée (`r hiv_mean_group %>% filter(any==1) %>% select(tb) %>% pourcentage()`)
@@ -97,7 +102,7 @@ model_any <- lm(got ~ any + age + poly(age,2) + male+ as.factor(educ2004)+everse
 model_full_any <- lm(got ~ any + age + poly(age,2) + male+as.factor(educ2004)+hadsex12+eversex+tb+land2004+hiv2004,data = hiv )
 
 model_spl_Ti <- lm(got ~ as.factor(Ti) ,data = hiv )
-model_Ti <- lm(got ~ as.factor(Ti) + age + poly(age,2) + male+ as.factor(educ2004)+eversex+tb+land2004+hiv2004,data = hiv )
+model_Ti <- lm(got ~ Ti + age + poly(age,2) + male+ as.factor(educ2004)+eversex+tb+land2004+hiv2004,data = hiv )
 model_full_Ti <- lm(got ~ as.factor(Ti) + age + poly(age,2) + male+as.factor(educ2004)+hadsex12+eversex+tb+land2004+hiv2004,data = hiv )
 
 ```
@@ -117,7 +122,24 @@ modelsummary(list("Montant spl" = model_spl_Ti
              , stars = TRUE
              )
 
+summary(model_Ti)
 ```
+
+#### Test d'égalité
+
+```{r}
+test <- hiv %>% 
+  mutate(Ti50 = if_else(Ti==50,1,0),
+         Ti100 = if_else(Ti==100,1,0),
+         Ti200 = if_else(Ti==200,1,0),
+         Ti300 = if_else(Ti==300,1,0),
+         )
+
+model_spl_Ti <- lm(got ~ Ti50 + Ti100+ Ti200+ Ti300 ,data = test )
+
+linearHypothesis(model_spl_Ti, "Ti200 = Ti300")
+```
+
 
 
 ## 4. Heterogénéité
