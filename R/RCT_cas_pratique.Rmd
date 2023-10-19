@@ -70,7 +70,23 @@ hiv_mean_group <- hiv %>%
 You can also embed plots, for example:
 
 ```{r pressure, echo=FALSE}
-plot(pressure)
+#Comparaison traitement/témoin
+hiv_mean_group %>% 
+  mutate(any=as.factor(any)) %>% 
+  ggplot(aes(x = any, y = got)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "Traitement", y = "Proportion de test récupérés", title = "Histogramme de la proportion hiv par traitement") +
+  scale_x_discrete(labels = c("témoin", "test"))
+
+#Comparaison selon incitation financière
+hiv %>% 
+  select(Ti,got) %>% 
+  mutate(Ti=as.factor(Ti)) %>% 
+    group_by(Ti) %>% 
+    summarise(got=mean(got,na.rm=T)) %>% 
+      ggplot() + 
+      geom_col(aes(y = Ti, x=got)) +
+      labs(x = "Proportion de test récupérés", y = "Incitation financière", title = "Impact du montant des incitations sur les tests HIV réalisés")
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## 3. Régression de l'effet
