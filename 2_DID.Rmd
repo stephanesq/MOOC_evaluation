@@ -1,0 +1,46 @@
+---
+title: "2_Diff-de-diff"
+author: "P. De Vreyer (PSL Dauphine)"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Double différence
+
+-   Conditions
+    -   Hétérogénéïté inobservée, qui explique participation et impact, fixe et additive (pas de variation au cours du temps mm si diff entre individus)
+    -   Au moins 2 observations par participants
+
+## Théorie
+
+-   Hypothèse principale : *parallel trends*
+    -   Entre les dates 0 et 1, l'évolution pour la population ayant reçu le traitement serait la même que pour celle témoin, sans traitement avec une quantité inobservable $E(Y_{t=1} (0) | T=1)$
+    -   $ E(Y_1 (0) | T=1) - E(Y_0 (1) | T=1) = E(Y_1 (0) | T=0) - E(Y_0 (0) | T=0)  $
+    -   D'où $E(Y_1 (0) | T=1) - E(Y_1 (0) | T=0) =  E(Y_0 (0) | T=1) - E(Y_0 (0) | T=0)$
+-   On retrouve initialement$$
+    ATE= Impact_{traités} - Impact_{traités ss traitement}
+    \\
+    = E(Y_1 (1) | T=1) - E(Y_1 (0) | T=1)
+    $$
+    -   Or $E(Y_1 (0) | T=1)$ est inobservable (contrefactuel) mais on peut introduire la situation en t=0, $E(Y_0(0) | T=1)$, pour exploiter l'hypothèse de tendances parallèles
+    -   D'où
+
+$$
+ATE = E(Y_1 (1) | T=1) - E(Y_1(0) | T=0) - [ E(Y_1 (0) | T=1) - E(Y_1(0) | T=0) ]
+\\
+=E(Y_1 (1) | T=1) - E(Y_1(0) | T=0) - [ E(Y_0(1)|T=1)−E(Y_0(0)|T=0) ]
+\\
+= E(Y_{t=1} (1) - Y_{t=0}(1) | T=1) - [ E(Y_{t=1} (0) - Y_{t=0}(0) | T=0) ] $$
+
+-   Le passage à une forme d'équation de régression permet de montrer les biais d'une simple différence entre groupe et d'une simple différence intertemporelle
+    -   On pose $Y_{it} = \alpha + \beta T_i*t + \gamma t + \rho T_i + \epsilon_{i,t}$
+    -   Intertemporelle $E(Y_{t=1} (1) - Y_{t=0}(1) | T=1) = \beta + \gamma$ avec \gamma comme biais
+    -   Intergroupe $E(Y_{t=1} (1) |T=1) - E(Y_{t=1}(0) | T=0) = \beta + \rho$
+
+## Limites et extensions
+
+-   Remise en cause de l'hypothèse des parallel trends, risque de sur/sous-estimation de l'effet du traitement si la population traitée est ciblée parce que plus dans le besoin (Ashenfelter dip)
