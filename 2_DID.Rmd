@@ -44,3 +44,13 @@ ATE = E(Y_1 (1) | T=1) - E(Y_1(0) | T=0) - [ E(Y_1 (0) | T=1) - E(Y_1(0) | T=0) 
 ## Limites et extensions
 
 -   Remise en cause de l'hypothèse des parallel trends, risque de sur/sous-estimation de l'effet du traitement si la population traitée est ciblée parce que plus dans le besoin (Ashenfelter dip)
+
+    -   Solution : combiner avec appariement (Propensity Score Matching)
+
+        -   Estimateur : $DD_{PSM} = 1/N_T \Sigma_i [Y_{i1}(1) - Y_{i0}(1) - \Sigma_j \omega_j (Y_{j1}(0) - Y_{j0}(0) ) ]$
+
+-   Estimateur de la triple différence avec plusieurs groupe de contrôle
+
+    -   Si plusieurs groupes de contrôle : soit utilisé successivement ; soit combiner pour avoir un seul estimateur (dit de triple différence)
+
+    -   A chaque groupe de contrôle, des biais spécifiques -\> les combiner = les réduire, en considérant que l'on peut réduire des biais sur une des populations de contrôle via des hypothèses sur l'évloution de l'autre population
