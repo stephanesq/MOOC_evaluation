@@ -1,0 +1,154 @@
+---
+title: "RCT_cas_pratique"
+author: "stephaneesquerre"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(haven)
+library(tidyverse)
+library(dplyr)
+library(here)
+library(gtsummary)
+library(car)
+```
+
+```{r import}
+ecole_tanz <- read_dta(paste0(here(),"/data/DID.dta"))
+
+ecole_tanz <- ecole_tanz %>% 
+  mutate(sex1994=as.numeric(as.character(sex1994)),
+         electric=as.numeric(as.character(electric)),
+         pipwater=as.numeric(as.character(pipwater)),
+         cluster=as.factor(cluster)
+         )
+```
+
+```{r}
+pourcentage <- function(decimal_value, decimal_places = 1) {
+  percentage <- format(decimal_value * 100, nsmall = decimal_places, digits = decimal_places + 2, trim = TRUE, justify = "right", decimal.mark = ",", big.mark = " ")
+  paste0(percentage, "%")
+}
+```
+
+## Contexte
+
+- Les données utilisées proviennent de la banque mondiale sur la contsruction d'écoles secondaires en Tanzanie (Beegle et al., 2006)
+- Objectif : campagne de construction dans les 80's mais pas partout
+
+## Stats desc
+
+```{r summary}
+summary(ecole_tanz)
+
+```
+
+```{r compar}
+tab_compar <-
+  ecole_tanz %>% 
+  # mutate(educ2004=as.factor(educ2004)) %>% 
+  gtsummary::tbl_summary(
+    include = c(sex1994,age1994,electric,pipwater,distcapital,primary,ocohort,ycohort),
+    by = treat, # split table by group
+    missing = "no" # don't list missing data separately
+  ) %>%
+  add_n() %>% 
+  add_p( # perform t-test for all variables test = everything() ~ "t.test"
+    )
+
+tanz_mean_group <- ecole_tanz %>%
+  group_by(treat) %>% 
+  summarise_all(mean, na.rm = T)
+
+tab_compar
+
+```
+```{r compar}
+tab_compar_vil <-
+  ecole_tanz %>% 
+  group_by(cluster) %>% 
+  mutate(ycohort_mean = mean(ycohort, na.rm = T),
+         ycohort_sum = sum(ycohort),
+         cohort_sum = sum(ycohort+ocohort),
+         primary_mean = mean(primary, na.rm = T),
+         ) %>% 
+  slice(1) %>% 
+  ungroup() %>% 
+  # mutate(educ2004=as.factor(educ2004)) %>% 
+  gtsummary::tbl_summary(
+    include = c(electric,pipwater,distcapital, ycohort_mean, ycohort_sum,cohort_sum, primary_mean),
+    by = treat, # split table by group
+    missing = "no" # don't list missing data separately
+  ) %>%
+  add_n() %>% 
+  add_p( # perform t-test for all variables test = everything() ~ "t.test"
+    )
+
+tab_compar_vil
+
+```
+
+- Les populations test et témoin se différencient sur 2 variables caractéristiques des villes (test de Wilcoxon)
+  - Le raccord électrique
+  - L'accès à l'eau potable
+
+Le choix des villages où sont construits les écoles n'est probablement pas anodain et pourrait trahir d'autres caractéristiques des villes, inobservées, et pouvant réfuter des évolutions similaires.
+Mais ces différences tombent lorsque l'on synthétise l'information au niveau village (cluster).
+
+## Simple différence (parallel trends hyp)
+
+```{r spldiff, echo=FALSE}
+#Comparaison traitement/témoin pour ycohort
+diff_ycohort <- lm(primary ~ treat, data=ecole_tanz %>% filter(ycohort > 0))
+summary(diff_ycohort)
+
+diff_ycohort_all <- lm(primary ~ treat + sex1994 + age1994 + I(age1994^2) + electric + pipwater + distcapital, data=ecole_tanz %>% filter(ycohort > 0))
+summary(diff_ycohort_all)
+
+#Comparaison traitement/témoin pour ocohort
+diff_ocohort <- lm(primary ~ treat, data=ecole_tanz %>% filter(ocohort > 0))
+summary(diff_ocohort)
+
+```
+L'effet sur la cohorte d'enfants est important (`r pourcentage(diff_ycohort[["coefficients"]][["(treat)"]])`) et significatif à tous les seuils mais ne permet pas de conclure seul dans l'impact de la construction des écoles secondaires.
+
+Le constat d'une éducation accrue dans les villages concernés pourrait être expliqué par d'autres facteurs (campagne en direction de tous les écoliers par exemple), d'où l'intérêt d'une double différence en intégrant la cohorte d'élèves plus âgés.
+
+## 3. Diff-de-diff
+
+### 3.1 Calcul des moyennes
+```{r mean}
+educ_mean <- ecole_tanz %>% 
+  group_by(treat,ycohort) %>% 
+  summarise(educ = mean(primary, na.rm=T)) %>% 
+  ungroup()
+
+diff_treat <- educ_mean %>% filter(treat==1 & ycohort==1) %>% select(educ) - educ_mean %>% filter(treat==1 & ycohort==0) %>% select(educ) 
+
+diff_untreat <- educ_mean %>% filter(treat==0 & ycohort==1) %>% select(educ) - educ_mean %>% filter(treat==0 & ycohort==0) %>% select(educ) 
+
+did <- diff_treat-diff_untreat
+did
+
+```
+### 3.2 Régression
+
+```{r reg_synth}
+#Comparaison traitement/témoin pour ycohort
+diff_ols <- lm(primary ~ ycohortxtreat + ycohort + treat, data=ecole_tanz)
+summary(diff_ols)
+
+diff_ols_all <- lm(primary ~ ycohortxtreat + ycohort + treat + sex1994 + age1994 + I(age1994^2) + electric + pipwater + distcapital, data=ecole_tanz)
+summary(diff_ols_all)
+
+diff_ols_cluster <- lm(primary ~ ycohortxtreat + ycohort + sex1994 + age1994 + I(age1994^2) + cluster, data=ecole_tanz)
+summary(diff_ols_cluster)
+
+diff_ols_cluster_femme <- lm(primary ~ ycohortxtreat + ycohort + age1994 + I(age1994^2) + cluster, data=ecole_tanz %>% filter(sex1994==0))
+summary(diff_ols_cluster_femme)
+
+```
+
+
