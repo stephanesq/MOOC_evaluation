@@ -19,8 +19,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 -   Hypothèse principale : *parallel trends*
     -   Entre les dates 0 et 1, l'évolution pour la population ayant reçu le traitement serait la même que pour celle témoin, sans traitement avec une quantité inobservable $E(Y_{t=1} (0) | T=1)$
-    -   $ E(Y_1 (0) | T=1) - E(Y_0 (1) | T=1) = E(Y_1 (0) | T=0) - E(Y_0 (0) | T=0)  $
-    -   D'où $E(Y_1 (0) | T=1) - E(Y_1 (0) | T=0) =  E(Y_0 (0) | T=1) - E(Y_0 (0) | T=0)$
+    -   \$ E(Y_1 (0) \| T=1) - E(Y_0 (1) \| T=1) = E(Y_1 (0) \| T=0) - E(Y_0 (0) \| T=0) \$
+    -   D'où $E(Y_1 (0) | T=1) - E(Y_1 (0) | T=0) = E(Y_0 (0) | T=1) - E(Y_0 (0) | T=0)$
 -   On retrouve initialement$$
     ATE= Impact_{traités} - Impact_{traités ss traitement}
     \\
