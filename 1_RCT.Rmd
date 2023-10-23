@@ -1,58 +1,97 @@
 ---
 title: "1_RCT"
-author: "stephaneesquerre"
+author: "L. Behaghel (PSE, JPAL)"
 date: "`r Sys.Date()`"
 output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
+
 # Les méthodes expérimentales
 
 ## Intérêt du tirage au sort
-- Si 
+
+-   En moyenne, caractéristiques identiques
+-   Si différence observée, provient du programme
 
 ## Comment tirer au sort
 
-Individuel ou par grappes (unité de tirage >= unité du traitement) : arbitrage entre biais (problème de contamination suivant le niveau) et puissance statistique (plus d’observations avec un niveau bas)  
-1. Tirage au sort simple -> référence en essai clinique ; généralement quand plus de candidats que de places en SES (« oversubscription design »)
-2. Bulle : deux populations prioritaires/l’autre non mais une « bulle » avec des candidats
-susceptibles 
-3. Mise en place progressive 
-4. Encouragement : pas possible de tirer au sort l’accès mais possible de jouer sur l’information (encouragement = variable instrumentale sur la participation) ; nécessite que les individus soient volontaires
+Individuel ou par grappes :
+
+-   unité de tirage \>= unité du traitement
+
+-   Arbitrage entre biais (problème de contamination suivant le niveau)
+    et puissance statistique (plus d'observations avec un niveau bas)
+
+Modes de tirage
+
+1.  Tirage au sort simple -\> référence en essai clinique ; généralement
+    quand plus de candidats que de places en SES (« oversubscription
+    design »)
+2.  Bulle : deux populations prioritaires/l'autre non mais une « bulle »
+    avec des candidats susceptibles
+3.  Mise en place progressive
+4.  Encouragement : pas possible de tirer au sort l'accès mais possible
+    de jouer sur l'information (encouragement = variable instrumentale
+    sur la participation) ; nécessite que les individus soient
+    volontaires
 
 ## Choisir la taille des échantillons
 
-###fluctuation d’échantillonnage
+### Fluctuation d'échantillonnage
 
-Liée au nombre de tirages -> deviennent imperceptibles avec n, (rappel : estimateur converge en proba vers la valeur de l’effet du traitement)
--> résumé avec la standard error/écart type de l’effet estimé du traitement (S= 1/2 pour 2 obs  -> s=0,07 pour 100—> 0,007 pour 10000)
--> on utilise l’intervalle de confiance avec CI_95 = ^Delta +- 1,96*S 
--> ^Delta <> 0 si t=^Delta/S > 1,96
--> Effet minimum détectable, dépend que de S, ex pour avoir 80% de chances de rejeter l’hypothèse nulle avec un risque de 5 %, EMD = 2,8*S (=20% pour N=100 …)
+Liée au nombre de tirages -\> deviennent imperceptibles avec n, (rappel
+: estimateur converge en proba vers la valeur de l'effet du traitement)
+-\> résumé avec la standard error/écart type de l'effet estimé du
+traitement (S= 1/2 pour 2 obs -\> s=0,07 pour 100---\> 0,007 pour 10000)
+-\> on utilise l'intervalle de confiance avec CI_95 = \^Delta +- 1,96*S
+-\> \^Delta \<\> 0 si t=\^Delta/S \> 1,96 -\> Effet minimum détectable,
+dépend que de S, ex pour avoir 80% de chances de rejeter l'hypothèse
+nulle avec un risque de 5 %, EMD = 2,8*S (=20% pour N=100 ...)
 
-### Ecart type de l’effet estimé du traitement (S)
+### Ecart type de l'effet estimé du traitement (S)
 
-S dépend du mode de tirage
-- S en tirage individuel -> on peut simplifier en considérant que la distribution des effets est la même dans les groupes témoin et test S = \sigma / ( n^1/2 * p * (1-p) ) : minimal quand la population témoin = population test (p=1/2) ; effet 
-- S en tirage en grappe -> effet du design S_grappe = S_simple * (1+\rho * m)^1/2, effets important de la correlation interclasse (ségrégation dans les classes) et de la taille des classes (m), on peut faire un lien avec ce que ça coûte en nombre d’observations en tirage simple (n)
--> Tirage stratifié : regrouper par strates 
+S dépend du mode de tirage - S en tirage individuel -\> on peut
+simplifier en considérant que la distribution des effets est la même
+dans les groupes témoin et test S = \sigma / ( n\^1/2 \* p \* (1-p) ) :
+minimal quand la population témoin = population test (p=1/2) ; effet - S
+en tirage en grappe -\> effet du design S_grappe = S_simple \*
+(1+\rho * m)\^1/2, effets important de la correlation interclasse
+(ségrégation dans les classes) et de la taille des classes (m), on peut
+faire un lien avec ce que ça coûte en nombre d'observations en tirage
+simple (n) -\> Tirage stratifié : regrouper par strates
 
 ### Enquête initiale
-- Mesurer la variable Y ou une proxy
-- Créer des strates, quitte à re-randomiser en cas de problèmes
-- A partir de l’écart type de Y, déduire un effet en évolution du traitement e
 
-##Limites et solutions
+-   Mesurer la variable Y ou une proxy
+-   Créer des strates, quitte à re-randomiser en cas de problèmes
+-   A partir de l'écart type de Y, déduire un effet en évolution du
+    traitement e
 
-1. Externalité du traitement -> « super témoin », i.e. des individus pas touchés, et si possible des paires permettant de mesure l’externalité (cf. accompagnement demandeurs d’emploi, jeu à somme nulle, Crépon, Duflo, .. QJE, 2013)
-2. Never takers dans le groupe testé dans un tirage par encouragement : ne doit pas être être séparé des compliers 
-- Possibilité de calculer un ITT (Intention To Treat) plutôt qu’ATE
-- Hors, % des never takers = dans le groupe témoin et dans le groupe test -> repondération de l’ITT pour calculer l’effet du traitement sur les compliers
--> le tirage au sort = rôle d’IV et remplit les 2 conditions de pertinence et d’exclusion (cf. Angrist, Imbens, and Rubin)
-3. Autres externalités : effet Hawthorne (renfort de l’effet par le dispositif) ; effet Henry ou au contraire découragement
--> idéalement placebo
--> testing / test en double aveugle afin d’éviter que les individus puissent manipuler les résultats
--> trouver des variables de résultats dures (recrutement plutôt que taux d’entretiens dans CV)
--> évaluer risque de biais avec données complémentaires
-4. Résultats pas transposables/pas transportables et dépend d’un contacte
--> réplication
--> « simple theory »
--> ajout d’une « structured speculation » sur la transposition étayée 
+## Limites et solutions
+
+1.  Externalité du traitement -\> « super témoin », i.e. des individus
+    pas touchés, et si possible des paires permettant de mesure
+    l'externalité (cf. accompagnement demandeurs d'emploi, jeu à somme
+    nulle, Crépon, Duflo, .. QJE, 2013)
+2.  Never takers dans le groupe testé dans un tirage par encouragement :
+    ne doit pas être être séparé des compliers
+
+-   Possibilité de calculer un ITT (Intention To Treat) plutôt qu'ATE
+-   Hors, % des never takers = dans le groupe témoin et dans le groupe
+    test -\> repondération de l'ITT pour calculer l'effet du traitement
+    sur les compliers -\> le tirage au sort = rôle d'IV et remplit les 2
+    conditions de pertinence et d'exclusion (cf. Angrist, Imbens, and
+    Rubin)
+
+3.  Autres externalités : effet Hawthorne (renfort de l'effet par le
+    dispositif) ; effet Henry ou au contraire découragement -\>
+    idéalement placebo -\> testing / test en double aveugle afin
+    d'éviter que les individus puissent manipuler les résultats -\>
+    trouver des variables de résultats dures (recrutement plutôt que
+    taux d'entretiens dans CV) -\> évaluer risque de biais avec données
+    complémentaires
+4.  Résultats pas transposables/pas transportables et dépend d'un
+    contacte -\> réplication -\> « simple theory » -\> ajout d'une
+    « structured speculation » sur la transposition étayée
