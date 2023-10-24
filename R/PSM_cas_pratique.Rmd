@@ -1,0 +1,208 @@
+---
+title: "PSM : cas pratique"
+author: "stephaneesquerre"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(haven)
+library(tidyverse)
+library(dplyr)
+library(here)
+library(gtsummary)
+theme_gtsummary_language("fr", decimal.mark = ",", big.mark = " ")
+library(car)
+```
+
+```{r import}
+sway <- read_dta(paste0(here(),"/data/PSM.dta"))
+
+#gestion des dummies revenus des parents
+sway <- sway %>% 
+  mutate(w25=if_else(w10==1,0,w25),
+         w75=if_else(w90==1,0,w75)
+         )
+```
+
+```{r}
+pourcentage <- function(decimal_value, decimal_places = 1) {
+  percentage <- format(decimal_value * 100, nsmall = decimal_places, digits = decimal_places + 2, trim = TRUE, justify = "right", decimal.mark = ",", big.mark = " ")
+  paste0(percentage, "%")
+}
+```
+
+## Contexte
+
+-   Les données utilisées proviennent d'une enquête du projet SWAY (Survey of War Affected Youth) collectées dans 2 districts d'Ouganda, soumis à des enlèvements pour participation à rébellion armée
+-   Objectif : impact de ces enlèvements (*abd*) sur le KH (*illiterate* et *educ*) et la participation au marché du travail (*emp_mo*)
+
+## Stats desc
+
+```{r summary}
+summary(sway)
+
+```
+
+```{r compar}
+tab_compar <-
+  sway %>% 
+  # mutate(educ2004=as.factor(educ2004)) %>% 
+  gtsummary::tbl_summary(
+    include = c(emp_mo,land_access,educ, illiterate, 
+                age,
+                fthr_ed,mthr_ed,orphan96,
+                w10,w25,w75,w90,
+                C_ach,C_akw,C_ata,C_kma,C_oro,C_pad,C_paj,C_pal),
+    by = abd, # split table by group
+    missing = "no" # don't list missing data separately
+  ) %>%
+  add_overall(last = TRUE) %>%  
+  add_n() %>% 
+  add_p( # perform t-test for all variables test = everything() ~ "t.test"
+    ) %>% 
+  modify_spanning_header(
+    update = all_stat_cols() ~ "**Victime d'un enlèvement ?**"
+  )
+
+# sway_mean_group <- sway %>%
+#   group_by(abd) %>% 
+#   summarise_all(mean, na.rm = T)
+
+tab_compar
+
+```
+
+-   `r pourcentage(mean(sway$abd))` des personnes enquêtées ont été victimes d'un enlèvement
+-   Les populations enlevées et les autres se différencient sur plusieurs variables (test de Wilcoxon)
+    -   Leur âge, qui peut avoir une incidence sur les deux outcomes
+    -   L'éducation de leur mère (mais pas de leur père), possible proxy du capital humain initial
+    -   Une information de capital éco (*w75*) parmi les 4 dispo
+    -   Le lieu de naissance, en particulier certains districts
+
+L'exploitation du score de propension à partir de ces variables prend pour hypothèse l'enlèvement comme un phénomène exogène et dont l'effet est uniforme sur les individus, ce qui paraît très exigeant. On peut facilement imaginer que l'âge des personnes lors de l'enlèvement et l'année de leur enlèvement pourraient compléter utilement les données collectées.
+
+A noter :
+
+-   de possibles externalités et effet de pairs (n'avoir pas été enlevé mais connaître des personnes enlevées ou avoir été enlevées avec d'autres)
+
+-   Des variables inobservables sur la motivation des individus, avec des effets peu identifiables de l'enlèvement
+
+## Score de propension
+
+On exploite une partie des éléments du site de Larmarange [(guide-R)](https://larmarange.github.io/guide-R)
+
+```{r ps, echo=FALSE}
+psm <- glm(
+  abd ~ age + I(age^2) + 
+    fthr_ed + mthr_ed + orphan96 + 
+    w10 + w25 + w75 + w90 +
+    C_akw + C_ata + C_kma + C_oro +C_pad + C_paj + C_pal,
+  family = binomial,
+  data = sway
+)
+
+# table avec ecarts type 
+psm %>% 
+  tbl_regression(
+    intercept = TRUE,
+    #exponentiate = TRUE, pour OR, rappel : diffèrent la plupart du temps des prevalence ratios, excepté si proba faible - <quelques % - où similaires
+    #add_pairwise_contrasts = TRUE pour avoir la comparaison des OR par paires de toutes les combinaisons des modalités de la variable
+    ) %>% 
+  add_significance_stars() %>% 
+  bold_labels()
+
+# Proba pour la situation de référence
+#logit_inverse <- binomial("logit") |> purrr::pluck("linkinv")
+#logit_inverse(-0.80)
+
+# représentation graphique et coeff
+psm %>% 
+  ggstats::ggcoef_table(exponentiate = TRUE)
+## avec modelsummary, on doit rajouter une option pour une échelle logarithmique
+# mod |>
+#   modelsummary::modelplot(exponentiate = TRUE) +
+#   ggplot2::scale_x_log10()
+
+```
+
+### Sélection de modèle
+
+```{r}
+# Sélection pas à pas (minimisation de l'AIC)
+psm2 <- step(psm
+             ,  scope = list(
+               lower = ~ w75
+               ) #forcer la présence d'une info sur les revenus
+             )
+
+# Minimisation du BIC (pénalise plus le nombre de degrés de liberté du modèle par rapport à AIC)
+psm3 <- psm %>% 
+  step(
+    k = psm %>% model.matrix() %>% nrow()  %>%  log()
+  )
+
+#Comparaison
+performance::compare_performance(psm, psm2, psm3)
+```
+
+### Verification
+
+```{r}
+sway_pred <- sway %>% 
+  mutate(prob1 = predict(psm, type="response"),
+         prob2 = predict(psm2, type="response"))
+
+sway_pred %>% 
+  ggplot() +
+    aes(x = prob1, fill = as.factor(abd)) +
+    geom_density(alpha = 0.7) 
+
+sway_pred %>% 
+  ggplot() +
+    aes(x = prob2, fill = as.factor(abd)) +
+    geom_density(alpha = 0.7) 
+
+```
+
+L'effet sur la cohorte d'enfants est important (`r pourcentage(diff_ycohort[["coefficients"]][["(treat)"]])`) et significatif à tous les seuils mais ne permet pas de conclure seul dans l'impact de la construction des écoles secondaires.
+
+Le constat d'une éducation accrue dans les villages concernés pourrait être expliqué par d'autres facteurs (campagne en direction de tous les écoliers par exemple), d'où l'intérêt d'une double différence en intégrant la cohorte d'élèves plus âgés.
+
+## 3. Diff-de-diff
+
+### 3.1 Calcul des moyennes
+
+```{r mean}
+educ_mean <- ecole_tanz %>% 
+  group_by(treat,ycohort) %>% 
+  summarise(educ = mean(primary, na.rm=T)) %>% 
+  ungroup()
+
+diff_treat <- educ_mean %>% filter(treat==1 & ycohort==1) %>% select(educ) - educ_mean %>% filter(treat==1 & ycohort==0) %>% select(educ) 
+
+diff_untreat <- educ_mean %>% filter(treat==0 & ycohort==1) %>% select(educ) - educ_mean %>% filter(treat==0 & ycohort==0) %>% select(educ) 
+
+did <- diff_treat-diff_untreat
+did
+
+```
+
+### 3.2 Régression
+
+```{r reg_synth}
+#Comparaison traitement/témoin pour ycohort
+diff_ols <- lm(primary ~ ycohortxtreat + ycohort + treat, data=ecole_tanz)
+summary(diff_ols)
+
+diff_ols_all <- lm(primary ~ ycohortxtreat + ycohort + treat + sex1994 + age1994 + I(age1994^2) + electric + pipwater + distcapital, data=ecole_tanz)
+summary(diff_ols_all)
+
+diff_ols_cluster <- lm(primary ~ ycohortxtreat + ycohort + sex1994 + age1994 + I(age1994^2) + cluster, data=ecole_tanz)
+summary(diff_ols_cluster)
+
+diff_ols_cluster_femme <- lm(primary ~ ycohortxtreat + ycohort + age1994 + I(age1994^2) + cluster, data=ecole_tanz %>% filter(sex1994==0))
+summary(diff_ols_cluster_femme)
+
+```
