@@ -7,6 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(devtools)
 library(haven)
 library(tidyverse)
 library(dplyr)
@@ -14,16 +15,24 @@ library(here)
 library(gtsummary)
 theme_gtsummary_language("fr", decimal.mark = ",", big.mark = " ")
 library(car)
+library(MatchIt)
+library(lmtest)
+library(sandwich)
+library(marginaleffects)
+
 ```
 
 ```{r import}
 sway <- read_dta(paste0(here(),"/data/PSM.dta"))
 
-#gestion des dummies revenus des parents
+#gestion des dummies revenus des parents + geo et année de naissance
 sway <- sway %>% 
   mutate(w25=if_else(w10==1,0,w25),
-         w75=if_else(w90==1,0,w75)
-         )
+         w75=if_else(w90==1,0,w75),
+         birthyear=as.factor(as.character(2005-age)),
+         location=as.factor(as.character(1* C_ach+2* C_akw+3* C_ata+4* C_kma+5* C_oro+6* C_pad+7* C_paj+8* C_pal))
+         )  
+  
 ```
 
 ```{r}
@@ -54,7 +63,8 @@ tab_compar <-
                 age,
                 fthr_ed,mthr_ed,orphan96,
                 w10,w25,w75,w90,
-                C_ach,C_akw,C_ata,C_kma,C_oro,C_pad,C_paj,C_pal),
+                birthyear,
+                location),
     by = abd, # split table by group
     missing = "no" # don't list missing data separately
   ) %>%
@@ -95,7 +105,7 @@ On exploite une partie des éléments du site de Larmarange [(guide-R)](https://
 
 ```{r ps, echo=FALSE}
 psm <- glm(
-  abd ~ age + I(age^2) + 
+  abd ~ birthyear + 
     fthr_ed + mthr_ed + orphan96 + 
     w10 + w25 + w75 + w90 +
     C_akw + C_ata + C_kma + C_oro +C_pad + C_paj + C_pal,
@@ -149,11 +159,20 @@ performance::compare_performance(psm, psm2, psm3)
 
 ### Verification
 
-```{r}
+```{r pred_mean}
+#Ajout des valeurs prédites
 sway_pred <- sway %>% 
   mutate(prob1 = predict(psm, type="response"),
          prob2 = predict(psm2, type="response"))
 
+sway_pred %>% 
+  group_by(abd) %>% 
+  summarise(prob1_mean = mean(prob1),
+            prob1_min = min(prob1),
+            prob1_max = max(prob1))
+```
+
+```{r predplot}
 sway_pred %>% 
   ggplot() +
     aes(x = prob1, fill = as.factor(abd)) +
@@ -166,26 +185,122 @@ sway_pred %>%
 
 ```
 
-L'effet sur la cohorte d'enfants est important (`r pourcentage(diff_ycohort[["coefficients"]][["(treat)"]])`) et significatif à tous les seuils mais ne permet pas de conclure seul dans l'impact de la construction des écoles secondaires.
+### `MatchIt` (plus proche voisin, full, exact)
 
-Le constat d'une éducation accrue dans les villages concernés pourrait être expliqué par d'autres facteurs (campagne en direction de tous les écoliers par exemple), d'où l'intérêt d'une double différence en intégrant la cohorte d'élèves plus âgés.
+!! pas *matching imputation* : l'implantation du matching diffère des méthodes de Abadie and Imbens ([2006](https://cran.r-project.org/web/packages/MatchIt/vignettes/matching-methods.html#ref-abadie2006), [2016](https://cran.r-project.org/web/packages/MatchIt/vignettes/matching-methods.html#ref-abadie2016)), que l'on retrouve dans `Matching` R package and `teffects` routine in Stata.
 
-## 3. Diff-de-diff
+-   *matching imputation* :
 
-### 3.1 Calcul des moyennes
+    -   where the missing potential outcomes for each unit are imputed using the observed outcomes of paired units.
 
-```{r mean}
-educ_mean <- ecole_tanz %>% 
-  group_by(treat,ycohort) %>% 
-  summarise(educ = mean(primary, na.rm=T)) %>% 
-  ungroup()
+    -   Avantages : propriétés connues ; utile pour estimer ATT et ATE ; des méthodes comme kernel peuvent être utilisées
 
-diff_treat <- educ_mean %>% filter(treat==1 & ycohort==1) %>% select(educ) - educ_mean %>% filter(treat==1 & ycohort==0) %>% select(educ) 
+-   Avantages ici du *nonparametric preprocessing* : plus flexible et généralement plus facile d'accès pour le public.
 
-diff_untreat <- educ_mean %>% filter(treat==0 & ycohort==1) %>% select(educ) - educ_mean %>% filter(treat==0 & ycohort==0) %>% select(educ) 
+On analyse l'évolution de la *standardised mean differences* (différence moyenne standardisée/centrée) : supérieure à 0.1 avant l'appariement, elle est inférieure pour toutes les variables a posteriori.
 
-did <- diff_treat-diff_untreat
-did
+#### 1 paire
+
+```{r}
+match_out1 <- matchit(
+  abd ~ birthyear + 
+    fthr_ed + mthr_ed + orphan96 + 
+    w10 + w25 + w75 + w90 +
+    location,
+  data = sway, 
+  method = "nearest", #plus proche voisin
+  distance ="glm", # logit
+  ratio = 1, #1 voisin
+  replace = TRUE #avec remplacement (pas de subclass puisque chaque obs. p-e utilisée plus d'1 fois)
+  )
+
+#verif automatisées
+summary(match_out)
+```
+
+#### Général
+
+```{r}
+match_out <- matchit(
+  abd ~ birthyear + 
+    fthr_ed + mthr_ed + orphan96 + 
+    w10 + w25 + w75 + w90 +
+    location,
+  data = sway, 
+  method = "nearest", #plus proche voisin
+  distance ="glm", # logit
+  replace = TRUE #avec remplacement (pas de subclass puisque chaque obs. p-e utilisée plus d'1 fois)
+  )
+
+#verif automatisées
+summary(match_out)
+```
+
+#### Kernel/Noyau
+
+```{r}
+# match_out <- matchit(
+#   abd ~ age + I(age^2) + 
+#     fthr_ed + mthr_ed + orphan96 + 
+#     w10 + w25 + w75 + w90 +
+#     C_akw + C_ata + C_kma + C_oro +C_pad + C_paj + C_pal,
+#   data = sway, 
+#   method = "full", #kernel/
+#   distance ="glm", # logit
+#   replace = TRUE #avec remplacement (pas de subclass puisque chaque obs. p-e utilisée plus d'1 fois)
+#   )
+# 
+# #verif automatisées
+# summary(match_out)
+```
+
+#### Analyse graphique :
+
+```{r}
+#plotting the balance 
+plot(match_out, type = "jitter", interactive = FALSE)
+plot(summary(match_out), abs = FALSE)
+```
+
+## 3. Régression PSM
+
+```{r psm_data}
+#On extrait les données appariées matched_sway
+matched_sway <- match.data(match_out) #sans remplacement
+#avec remplacement
+```
+
+Nécessaire de prendre en compte :
+
+-   Pondération (`weight`)
+
+-   Clustering-robust des standard errors (`subclass`)
+
+!! : Difficulté si l'on décide d'utiliser plusieurs fois les observations pour le clustering (cf [ici](https://cran.r-project.org/web/packages/MatchIt/vignettes/matching-methods.html#matching-with-replacement-replace) et explications [ici](https://cran.r-project.org/web/packages/MatchIt/vignettes/estimating-effects.html#failing-to-use-robust-or-cluster-robust-standard-errors)) :
+
+-   Robust SE : soit on modifie vcov = \~subclass to vcov = "HC3"
+
+-   Alternative en exploitant les paires créées (à voir)
+
+#### Illiterate
+
+```{r illiterate}
+#We need to specify the weights - Matched participants have a weight of 1, unmatched participants 
+illit_psm <- lm(illiterate ~ abd * (age + I(age^2) + 
+    fthr_ed + mthr_ed + orphan96 + 
+    w10 + w25 + w75 + w90 +
+    C_akw + C_ata + C_kma + C_oro +C_pad + C_paj + C_pal), 
+                data = matched_sway, 
+                weights = weights
+                )
+
+#Calcul de l'ATT avec marginaleffects / attention aux poids et clustering
+avg_comparisons(illit_psm,
+                variables = "abd",
+                vcov = "HC3", #~subclass, si paire unique
+                newdata = subset(matched_sway, abd == 1),
+                wts = "weights"
+                )
 
 ```
 
